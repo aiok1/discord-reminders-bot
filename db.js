@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS reminders(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 user_id TEXT,
 text TEXT,
-active INTEGER
+active INTEGER,
+sticky INTEGER
 )
 `);
 

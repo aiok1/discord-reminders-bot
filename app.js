@@ -10,14 +10,12 @@ import {
   MessageComponentTypes,
   verifyKeyMiddleware,
 } from 'discord-interactions';
-import { getRandomEmoji, DiscordRequest } from './utils.js';
+import { DiscordRequest } from './utils.js';
 
 // Create an express app
 const app = express();
 // Get port, or default to 3000
 const PORT = process.env.PORT || 3000;
-// To keep track of our active games
-const activeGames = {};
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
@@ -27,17 +25,10 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
   // Interaction id, type and data
   const { id, type, data } = req.body;
 
-  /**
-   * Handle verification requests
-   */
   if (type === InteractionType.PING) {
     return res.send({ type: InteractionResponseType.PONG });
   }
 
-  /**
-   * Handle slash command requests
-   * See https://discord.com/developers/docs/interactions/application-commands#slash-commands
-   */
   if (type === InteractionType.MODAL_SUBMIT) {
     const userId = req.body.member?.user?.id || req.body.user?.id;
 
@@ -45,7 +36,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
       const rawText = data.components[0].components[0].value;
       const lineslist = rawText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
-      const insert = db.prepare('INSERT INTO reminders (user_id, text, active) VALUES (?, ?, 1)');
+      const insert = db.prepare('INSERT INTO reminders (user_id, text, active, sticky) VALUES (?, ?, 1, 0)');
       for (const line of lineslist) {
         insert.run(userId, line);
       }
@@ -66,29 +57,19 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
     const userId = req.body.member?.user?.id || req.body.user?.id;
 
 
-    // "test" command
-    if (name === 'test') {
-      // Send a message into the channel where command was triggered from
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          flags: InteractionResponseFlags.IS_COMPONENTS_V2,
-          components: [
-            {
-              type: MessageComponentTypes.TEXT_DISPLAY,
-              // Fetches a random emoji to send from a helper function
-              content: `hello world ${getRandomEmoji()}`
-            }
-          ]
-        },
-      });
-    }
 //reminder command
       if (name==='reminder') {
-	const userReminders= db.prepare('SELECT * FROM reminders WHERE user_id = ? AND active =1').all(userId);
+        const userReminders= db.prepare('SELECT * FROM reminders WHERE user_id = ? AND active =1 AND sticky =0').all(userId);
         const randomid = Math.floor(Math.random() * userReminders.length);
-	const random= userReminders[randomid];
-
+        const random= userReminders[randomid];
+        if (userReminders.length===0) 
+          {return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { flags: InteractionResponseFlags.IS_COMPONENTS_V2, components: [
+            { type: MessageComponentTypes.TEXT_DISPLAY, content: `No reminder found, add one with add or /add_all`}
+          ]},
+        });   
+      };
 	return res.send({
 	  type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
 	  data: {
@@ -121,7 +102,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
       });
     }
     reminder.active = false;
-    db.prepare('UPDATE reminders set active=0 WHERE id= ?').run(idToRetire);
+    db.prepare('UPDATE reminders set active=0 WHERE id= ? AND user_id=?').run(idToRetire,userId);
 
     return res.send({
       type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -136,7 +117,7 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
     const newText = options.find(opt => opt.name === 'text').value;
 
     const fileData = db.prepare('SELECT * FROM reminders WHERE user_id=? AND active=1').all(userId);
-    const result=db.prepare('INSERT INTO reminders (user_id, text, active) VALUES (?,?,1)').run(userId,newText);
+    const result=db.prepare('INSERT INTO reminders (user_id, text, active, sticky) VALUES (?,?,1,0)').run(userId,newText);
     const newId= result.lastInsertRowid
     return res.send({
       type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -169,7 +150,78 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
       ]
     },
   });
-} 
+  }
+  if (name==="sticky") {
+    const option = data.options;
+    const idToSticky = option.find(opt => opt.name === 'id').value
+    const reminder = db.prepare('SELECT * FROM reminders WHERE id = ? AND user_id = ? AND active = 1').get(idToSticky, userId);
+    db.prepare('UPDATE reminders set sticky=1 WHERE id=? AND user_id=?').run(idToSticky, userId)
+    if (!reminder) {
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { flags: InteractionResponseFlags.IS_COMPONENTS_V2, components: [
+          { type: MessageComponentTypes.TEXT_DISPLAY, content: `No sticky found with id ${idToSticky}` }
+        ]},
+      });
+    }
+     return res.send({
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: { flags: InteractionResponseFlags.IS_COMPONENTS_V2, components: [
+        { type: MessageComponentTypes.TEXT_DISPLAY, content: `Stickied: "${reminder.text}"` }
+      ]},
+    });
+  }
+  if (name==="unsticky") {
+    const option = data.options;
+    const idToUnsticky = option.find(opt => opt.name === 'id').value
+    const reminder = db.prepare('SELECT * FROM reminders WHERE id = ? AND user_id = ? AND active = 1').get(idToUnsticky, userId);
+    db.prepare('UPDATE reminders set sticky=0 WHERE id=? AND user_id=?').run(idToUnsticky, userId)
+    if (!reminder) {
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { flags: InteractionResponseFlags.IS_COMPONENTS_V2, components: [
+          { type: MessageComponentTypes.TEXT_DISPLAY, content: `No sticky found with id ${idToUnsticky}` }
+        ]},
+      });
+    }
+    return res.send({  
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,  
+      data: { flags: InteractionResponseFlags.IS_COMPONENTS_V2, components: [  
+        { type: MessageComponentTypes.TEXT_DISPLAY, content: `Unstickied: "${reminder.text}"` }
+      ]},  
+    });  
+  }  
+
+  if (name==='show_sticky') {
+    const fileData=db.prepare('SELECT * FROM reminders WHERE user_id= ? AND active = 1 AND sticky=1').all(userId);
+    var formattedData= fileData.map(r => `#${r.id}:  ${r.text}`).join('\n');
+    if (formattedData.length>1900) {
+      formattedData = formattedData.slice(0,1900);
+      formattedData += '\n \n ...'}
+    return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { flags: InteractionResponseFlags.IS_COMPONENTS_V2, components: [
+          { type: MessageComponentTypes.TEXT_DISPLAY, content: `All stickies: \n  ${formattedData}`}
+        ]},
+      });
+    }
+
+   if (name==='show_reminders') {
+    const fileData=db.prepare('SELECT * FROM reminders WHERE user_id= ? AND active = 1 AND sticky=0').all(userId);
+    var formattedData= fileData.map(r => `#${r.id}:  ${r.text}`).join('\n');
+    if (formattedData.length>1900) {
+      formattedData = formattedData.slice(0,1900);
+      formattedData += '\n \n ...' }
+    return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { flags: InteractionResponseFlags.IS_COMPONENTS_V2, components: [
+          { type: MessageComponentTypes.TEXT_DISPLAY, content: `All reminders: \n  ${formattedData}`}
+        ]},
+      });
+    } 
+
+
+ 
 
 
  console.error(`unknown command: ${name}`);

@@ -50,8 +50,55 @@ const ADD_ALL_COMMAND = {
   contexts: [0,1,2],
 };
 
+//sticky reminders for easy access, not shown in random generation
+const STICKY_COMMAND = {name: 'sticky',
+  description: 'make a reminder sticky',
+  options: [
+    {
+      type: 4, // INTEGER
+      name: 'id',
+      description: 'The ID of the reminder to sticky',
+      required: true,   
+    },
+  ],
+  type: 1,
+  integration_types: [0, 1],
+  contexts: [0, 1, 2],
+};
 
-const ALL_COMMANDS = [REMINDER_COMMAND, RETIRE_COMMAND, ADD_COMMAND, ADD_ALL_COMMAND];
+const UNSTICKY_COMMAND = {name: 'unsticky',
+  description: 'make a reminder unsticky',
+  options: [
+    {
+      type: 4, // INTEGER
+      name: 'id',
+      description: 'The ID of the reminder to unsticky',
+      required: true,
+    },
+  ],
+  type: 1,
+  integration_types: [0, 1],
+  contexts: [0, 1, 2],
+};
+
+
+const SHOW_STICKY_COMMAND = {
+  name: 'show_sticky',
+  description: 'show all sticky reminders',
+  type: 1,
+  integration_types: [0,1],
+  contexts: [0,1,2],
+};
+
+const SHOW_REMINDERS_COMMAND = {
+  name: 'show_reminders',
+  description: 'show all normal reminders',                                           
+  type: 1,
+  integration_types: [0,1],
+  contexts: [0,1,2],
+};
+
+const ALL_COMMANDS = [REMINDER_COMMAND, RETIRE_COMMAND, ADD_COMMAND, ADD_ALL_COMMAND, STICKY_COMMAND, UNSTICKY_COMMAND, SHOW_STICKY_COMMAND, SHOW_REMINDERS_COMMAND];
 
 InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
 
