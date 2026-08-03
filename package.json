@@ -1,0 +1,26 @@
+{
+  "name": "discord-example-app",
+  "version": "1.0.0",
+  "description": "",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aiok1/discord-reminders-bot.git"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/aiok1/discord-reminders-bot/issues"
+  },
+  "homepage": "https://github.com/aiok1/discord-reminders-bot#readme",
+  "dependencies": {
+    "better-sqlite3": "^13.0.2",
+    "db": "^6.0.3",
+    "discord-interactions": "^4.4.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
