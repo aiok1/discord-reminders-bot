@@ -2,7 +2,7 @@
   "name": "discord-example-app",
   "version": "1.0.0",
   "description": "",
-  "type": "commonjs",
+  "type": "module",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
